@@ -1,0 +1,1037 @@
+---
+title: "NHANES Informative Prior Analysis"
+author: "Glen McGee"
+date: "10/28/2021"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+R <- 120000     ## no. of iterations  # 90000 for dirichlet      
+burn <- 0.40    ## percent burn-in
+thin <- 20      ## thinning number  ## 15 for dirichlet   
+sel <- seq(burn*R+1,R,by=thin) 
+
+### load libraries
+library(bsmim2)
+# library(BSMIM)
+library(bkmr)
+library(GIGrvg)
+library(refund)
+library(ggplot2)
+library(gridExtra)
+library(tidyverse)
+library(splines)
+library(MASS)
+library(patchwork)
+library(ghibli)
+library(ggthemes)
+library(grid)
+# library(kableExtra)
+library(xtable)
+
+path="~/Dropbox/Glen Brent PostDoc/Informative Priors/Code/NHANES_analysis/Results/"
+
+#loads an RData file, and returns it with new name
+loadRData <- function(fileName){
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+# 
+# printCI <- function(df,col1,col2,dig=2){
+#   
+#   CI <- paste0("(",round(df[,col1],dig),", ",round(df[,col2],dig),")")
+#   res <- CI
+#   if(col1>1){
+#     res <- cbind(df[1:(col1-1)],CI)
+#   }
+#   if(col2<ncol(df)){
+#     res <- cbind(res,df[(col2+1):ncol(df)])
+#   }
+#   return(res)
+# }
+# 
+# getqgcWeights <- function(obj,nexp=8){
+#   coefs <- obj$fit$coef[1+(1:nexp)] #exclude intercept
+#   pos.weights <- coefs/sum(coefs[coefs>=0])
+#   neg.weights <- coefs/sum(coefs[coefs<0])
+#   weights <- cbind(pos.weights,neg.weights)
+#   weights[coefs<0,1] <- NA
+#   weights[coefs>=0,2] <- NA
+#   return(weights)
+# }
+
+
+```
+
+
+
+
+
+
+
+
+# Single Index Analysis
+
+
+```{r loaddat, echo=FALSE, fig.height=9, fig.width=9, warning=FALSE}
+
+# suffix="analysis"
+# chain=1
+mod_names=c("unconstrained_index3","unconstrained_lowvarsel_index3","constrained_index3","constrained_lowvarsel_index3","dirichlet_index3","dirichlet_varsel_index3","dirichlet_lowvarsel_index3","TEQ_index3")#,
+          #  "unconstrained_all","constrained_all","dirichlet_all","dirichlet_varsel_all","TEQ_all")
+mods <- list()
+for(mm in 1:length(mod_names)){
+  mods[[mm]] <- loadRData(paste0(path,"res_list_",mod_names[mm],".RData"))
+}
+names(mods) <- mod_names
+
+# CVmods <- list()
+# for(mm in 1:length(mod_names)){
+#   CVmods[[mm]] <- list()
+#   for(vv in 1:5){
+#     CVmods[[mm]][[vv]] <- loadRData(paste0(path,mod_names[mm],"_list_",suffix,"_CV",vv,".RData"))
+#   }
+# }
+# names(CVmods) <- mod_names
+
+```
+
+## Index Curves (Single Index)
+
+```{r indexwise, echo=FALSE,  warning=FALSE}
+plot_inds <- list()
+for(mm in 1:length(mod_names)){
+  plot_inds[[mm]] <- plot_univar_hnew_indexwise2(mods[[mm]]$pred_ind,ylims=c(-0.5,0.75))
+}
+plot_inds
+```
+
+
+## Univariate Curves (Single Index)
+
+```{r componentwise, echo=FALSE, warning=FALSE}
+plots_univar <- list()
+
+
+for(mm in 1:(length(mod_names)-1)){
+    plots_univar[[mm]] <- list()
+    for(ll in 1:8){
+      plots_univar[[mm]][[ll]] <- plot_univar_hnew2(mods[[mm]]$pred_assoc,ylims=c(-0.25,0.75))[[1]][[ll]]
+  }
+}
+names(plots_univar) <- mod_names[-length(mod_names)]
+# plots_univar
+```
+
+
+
+```{r report_plots_univar, echo=FALSE,  warning=FALSE}
+jj <- 5
+plots_univar$unconstrained_index3[[jj]]
+# plots_univar$unconstrained_lowvarsel_index3[[jj]]
+plots_univar$constrained_index3[[jj]]
+# plots_univar$constrained_lowvarsel_index3[[jj]]
+plots_univar$dirichlet_index3[[jj]]
+# plots_univar$dirichlet_lowvarsel_index3[[jj]]
+plots_univar$dirichlet_varsel_index3[[jj]]
+
+```
+
+## Weights (Single Index)
+
+```{r plot_weights, echo=FALSE, warning=FALSE}
+w_prior <- c(0.08534430,0.49307994,0.06769525,0.01899547,0.21026788,0.06030999,0.05130900,0.01299818)
+
+boxplot(mods$unconstrained_index3$fit$theta[[1]],ylim=c(-1,1));points((w_prior)/sqrt(sum((w_prior)^2)),col="red",pch=19)
+# boxplot(mods$unconstrained_lowvarsel_index3$fit$theta[[1]],ylim=c(-1,1));points((w_prior)/sqrt(sum((w_prior)^2)),col="red",pch=19)
+boxplot(mods$constrained_index3$fit$theta[[1]],ylim=c(-1,1));points((w_prior)/sqrt(sum((w_prior)^2)),col="red",pch=19)
+# boxplot(mods$constrained_lowvarsel_index3$fit$theta[[1]],ylim=c(-1,1));points((w_prior)/sqrt(sum((w_prior)^2)),col="red",pch=19)
+boxplot(mods$dirichlet_index3$fit$theta[[1]],ylim=c(-1,1));points((w_prior)/sqrt(sum((w_prior)^2)),col="red",pch=19)
+boxplot(mods$dirichlet_varsel_index3$fit$theta[[1]],ylim=c(-1,1));points((w_prior)/sqrt(sum((w_prior)^2)),col="red",pch=19)
+# boxplot(mods$dirichlet_lowvarsel_index3$fit$theta[[1]],ylim=c(-1,1));points((w_prior)/sqrt(sum((w_prior)^2)),col="red",pch=19)
+```
+
+
+```{r weights, echo=FALSE,warning=FALSE}
+weights <- list()
+for(mm in 1:length(mod_names)){
+  weights[[mm]] <- round(summarize_thetas(mods[[mm]]$fit)[[1]],2)
+}
+weights
+
+
+
+```
+
+
+
+## Grid of Plots (Single Index)
+
+
+```{r grid, echo=FALSE, warning=FALSE}
+RR <- 8000
+w_prior <- c(0.08534430,0.49307994,0.06769525,0.01899547,0.21026788,0.06030999,0.05130900,0.01299818)
+
+## constrained
+prior_constrained <- investigate_priors(8,RR,constraint=1,prior_slabpos=mods$constrained_index3$fit$prior_slabpos,prior_pi=mods$constrained_index3$fit$prior_pi)
+## constrained and ordered
+prior_ordered <- investigate_priors(8,RR,constraint=1,prior_slabpos=c(1.6,8),prior_pi=c(1,0.5))
+## dirichlet without varselection
+prior_dirichlet <- investigate_priors(8,RR,constraint=2,prior_slabpos=mods$dirichlet_index3$fit$prior_slabpos,prior_pi=mods$dirichlet_index3$fit$prior_pi,prior_alphas=mods$dirichlet_index3$fit$prior_alphas[[1]])
+## dirichlet with varselection
+prior_dirichlet_varsel <- investigate_priors(8,RR,constraint=1,prior_slabpos=mods$dirichlet_varsel_index3$fit$prior_slabpos,prior_pi=mods$dirichlet_varsel_index3$fit$prior_pi,prior_slabpos_shape_inf=mods$dirichlet_varsel_index3$fit$prior_slabpos_shape_inf[[1]])
+
+df_constrained <- data.frame(prior_constrained$thetaPOS); colnames(df_constrained) <- as.character(1:8)
+df_constrained <- gather(df_constrained,component,weight)
+
+violin_constrained <- ggplot(data=df_constrained,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Constrained"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+# df_ordered <- prior_ordered$thetaPOS
+# L <- matrix(0,nrow=8,ncol=8) ## rank them
+# L[lower.tri(L)] <- 1
+# df_ordered <- df_ordered%*%L
+# df_ordered <- df_ordered[,rank(-w_prior)] ## put in correct order
+# df_ordered <- df_ordered/apply(df_ordered,1,sum) ## standardize to be w
+# colnames(df_ordered) <- as.character(1:8)
+# df_ordered <- gather(data.frame(df_ordered),component,weight)
+# 
+# violin_ordered <- ggplot(data=df_ordered,aes(y=weight,x=component))+
+#     geom_violin(trim=TRUE, fill="gray",scale="width")+
+#     # labs(title=expression("Informative Dirichlet Priors ("*L[m]*"=3)"),x="Component", y = "Weight")+
+#     labs(title=paste("Ordered"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+#     ylim(c(0,1))+
+#     # geom_boxplot(width=0.1)+
+#     theme_classic()
+
+
+df_dirichlet <- data.frame(prior_dirichlet$thetaPOS); colnames(df_dirichlet) <- as.character(1:8)
+df_dirichlet <- gather(df_dirichlet,component,weight)
+
+violin_dirichlet <- ggplot(data=df_dirichlet,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Dirichlet"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+df_dirichlet_varsel <- data.frame(prior_dirichlet_varsel$thetaPOS); colnames(df_dirichlet_varsel) <- as.character(1:8)
+df_dirichlet_varsel <- gather(df_dirichlet_varsel,component,weight)
+
+violin_dirichlet_varsel <- ggplot(data=df_dirichlet_varsel,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet Priors ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    labs(title=paste("Dirichlet+Selection"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+
+df_TEQ <- data.frame(weight=w_prior,component=1:8)
+
+violin_TEQ <- ggplot(data=df_TEQ,aes(y=weight,x=component))+
+    geom_point(shape=4)+
+    # labs(title=expression("Informative Dirichlet Priors ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    labs(title=paste("TEQ (Fixed Weights)"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+## posteriors
+
+postdf_constrained <- data.frame(mods$constrained_index3$fit$thetaPOS[[1]]); colnames(postdf_constrained) <- as.character(1:8)
+postdf_constrained <- gather(postdf_constrained,component,weight)
+
+postviolin_constrained <- ggplot(data=postdf_constrained,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Constrained"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+# postdf_ordered <- data.frame(mods$ordered_index3$fit$thetaPOS[[1]]); colnames(postdf_ordered) <- as.character(1:8)
+# postdf_ordered <- gather(postdf_ordered,component,weight)
+# 
+# postviolin_ordered <- ggplot(data=postdf_ordered,aes(y=weight,x=component))+
+#     geom_violin(trim=TRUE, fill="gray",scale="width")+
+#     # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+#     # ylim(c(0,1))+
+#     labs(title=paste("ordered"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+#     ylim(c(0,1))+
+#     # geom_boxplot(width=0.1)+
+#     theme_classic()
+
+postdf_dirichlet <- data.frame(mods$dirichlet_index3$fit$thetaPOS[[1]]); colnames(postdf_dirichlet) <- as.character(1:8)
+postdf_dirichlet <- gather(postdf_dirichlet,component,weight)
+
+postviolin_dirichlet <- ggplot(data=postdf_dirichlet,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Dirichlet"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+postdf_dirichlet_varsel <- data.frame(mods$dirichlet_varsel_index3$fit$thetaPOS[[1]]); colnames(postdf_dirichlet_varsel) <- as.character(1:8)
+postdf_dirichlet_varsel <- gather(postdf_dirichlet_varsel,component,weight)
+
+postviolin_dirichlet_varsel <- ggplot(data=postdf_dirichlet_varsel,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Dirichlet+Selection"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+postdf_TEQ <- data.frame(weight=w_prior,component=1:8)
+
+postviolin_TEQ <- ggplot(data=df_TEQ,aes(y=weight,x=component))+
+    geom_point(shape=4)+
+    # labs(title=expression("Informative Dirichlet Priors ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    labs(title=paste("TEQ (Fixed Weights)"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+## indexwise plots
+index_constrained <- plot_univar_hnew_indexwise2(mods$constrained_index3$pred_ind,ylims=c(-0.5,0.5))[[1]]
+# index_ordered <- plot_univar_hnew_indexwise2(mods$ordered_index3$pred_ind,ylims=c(-0.5,0.5))[[1]]
+index_dirichlet <- plot_univar_hnew_indexwise2(mods$dirichlet_index3$pred_ind,ylims=c(-0.5,0.5))[[1]]
+index_dirichlet_varsel <- plot_univar_hnew_indexwise2(mods$dirichlet_varsel_index3$pred_ind,ylims=c(-0.5,0.5))[[1]]
+index_TEQ <- plot_univar_hnew_indexwise2(mods$TEQ_index3$pred_ind,ylims=c(-0.5,0.5))[[1]]
+
+## overall plots
+overall_constrained <- plot_univar_hnew2(mods$constrained_index3$pred_overall,ylims=c(-0.4,0.6))
+# overall_ordered <- plot_univar_hnew2(mods$ordered_overall3$pred_overall,ylims=c(-0.4,0.6))
+overall_dirichlet <- plot_univar_hnew2(mods$dirichlet_index3$pred_overall,ylims=c(-0.4,0.6))
+overall_dirichlet_varsel <- plot_univar_hnew2(mods$dirichlet_varsel_index3$pred_overall,ylims=c(-0.4,0.6))
+overall_TEQ <- plot_univar_hnew2(mods$TEQ_index3$pred_overall,ylims=c(-0.4,0.6))
+
+
+gridplots <- arrangeGrob(violin_constrained,
+  # violin_ordered, ## didnt run ordered!
+  violin_dirichlet_varsel,
+  violin_dirichlet,
+  violin_TEQ,
+  postviolin_constrained,
+  # postviolin_ordered,
+  postviolin_dirichlet_varsel,
+  postviolin_dirichlet,
+  postviolin_TEQ,
+  index_constrained, ## indexwise look similar because we fix the weights!
+  # index_ordered,
+  index_dirichlet_varsel,
+  index_dirichlet,
+  index_TEQ,
+  # overall_constrained,
+  # # overall_ordered,
+  # overall_dirichlet_varsel,
+  # overall_dirichlet,
+  # overall_TEQ,
+  nrow=3)
+
+ggsave("gridplots.pdf",plot=gridplots,width=12,height=12,units="in")
+
+## unconstrained
+index_unconstrained <- plot_univar_hnew_indexwise2(mods$unconstrained_index3$pred_ind,ylims=c(-0.5,0.5))[[1]]
+ggsave("index_unconstrained.pdf",plot=index_unconstrained,width=3,height=3,units="in")
+
+```
+
+## Estimated Means (Single Index)
+
+```{r estimated_means, echo=FALSE,  warning=FALSE}
+newz <- NULL#matrix(0,nrow=2,ncol=ncol(mods$TEQ_index3$fit$z))
+xmedians <- apply(mods$constrained_index3$fit$x[[1]],2,median)
+newx <- matrix(xmedians,nrow=2,ncol=length(xmedians),byrow=TRUE)
+newx[,2] <- quantile(mods$constrained_index3$fit$x[[1]][,2],c(0.75,0.25)) 
+newx[,5] <- quantile(mods$constrained_index3$fit$x[[1]][,5],c(0.25,0.75))
+TEQ_wts <- c(0.6984289,4.0351995,0.5539950,0.1554525,1.7207612,0.4935566,0.4198955,0.1063727 )
+newxTEQ <- newx%*%TEQ_wts
+est_7525_constrained <- predict_hnew_X2(mods$constrained_index3$fit,newX=list(newx),newZ = newz)
+est_7525_dirichlet_varsel <- predict_hnew_X2(mods$dirichlet_varsel_index3$fit,newX=list(newx),newZ = newz)
+est_7525_dirichlet <- predict_hnew_X2(mods$dirichlet_index3$fit,newX=list(newx),newZ = newz)
+est_7525_TEQ <- predict_hnew_X2(mods$TEQ_index3$fit,newX=list(as.matrix(newxTEQ)),newZ = newz)
+
+```
+
+```{r estimated_mean_out, echo=FALSE,  warning=FALSE}
+print("constrained")
+cbind(est_7525_constrained$fits$mean,est_7525_constrained$fits$lower,est_7525_constrained$fits$upper)
+print("dirichlet + selection")
+cbind(est_7525_dirichlet_varsel$fits$mean,est_7525_dirichlet_varsel$fits$lower,est_7525_dirichlet_varsel$fits$upper)
+print("dirichlet")
+cbind(est_7525_dirichlet$fits$mean,est_7525_dirichlet$fits$lower,est_7525_dirichlet$fits$upper)
+print("TEQ")
+cbind(est_7525_TEQ$fits$mean,est_7525_TEQ$fits$lower,est_7525_TEQ$fits$upper)
+
+```
+
+## Model fit (Single Index)
+
+```{r MSE, echo=FALSE, warning=FALSE}
+
+mods$unconstrained_index3$cv$RMSE
+mods$constrained_index3$cv$RMSE
+mods$dirichlet_index3$cv$RMSE
+mods$dirichlet_varsel_index3$cv$RMSE
+mods$TEQ_index3$cv$RMSE
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Results for all-index analysis
+
+
+```{r loaddat_all, echo=FALSE, fig.height=9, fig.width=9, warning=FALSE}
+
+# suffix="analysis"
+# chain=1
+mod_names_all=c("unconstrained_all","constrained_all","dirichlet_all","dirichlet_varsel_all","TEQ_all")
+mods_all <- list()
+for(mm in 1:length(mod_names_all)){
+  mods_all[[mm]] <- loadRData(paste0(path,"res_list_",mod_names_all[mm],".RData"))
+}
+names(mods_all) <- mod_names_all
+
+# CVmods_all <- list()
+# for(mm in 1:length(mod_names_all)){
+#   CVmods_all[[mm]] <- list()
+#   for(vv in 1:5){
+#     CVmods_all[[mm]][[vv]] <- loadRData(paste0(path,mod_names_all[mm],"_list_",suffix,"_CV",vv,".RData"))
+#   }
+# }
+# names(CVmods_all) <- mod_names_all
+
+```
+
+## Index Curves (3 index model)
+
+```{r indexwise_all, echo=FALSE,  warning=FALSE}
+
+
+plot_inds <- list()
+for(mm in 1:(length(mod_names_all))){
+    plot_inds[[mm]] <- plot_univar_hnew_indexwise2(mods_all[[mm]]$pred_ind,ylims=c(-0.5,0.5))
+}
+names(plot_inds) <- mod_names_all
+
+```
+
+
+```{r plot_indexwise_all, echo=FALSE,  warning=FALSE}
+jj <- 3
+plot_inds$unconstrained_all[[jj]]
+plot_inds$constrained_all[[jj]]
+plot_inds$dirichlet_all[[jj]]
+plot_inds$dirichlet_varsel_all[[jj]]
+plot_inds$TEQ_all[[jj]]
+
+```
+
+
+
+## Grid of Plots (3 index model)
+
+
+```{r grid_all, echo=FALSE, warning=FALSE}
+RR <- 8000
+w_prior <- c(0.08534430,0.49307994,0.06769525,0.01899547,0.21026788,0.06030999,0.05130900,0.01299818)
+
+
+## constrained
+prior_constrained <- investigate_priors(8,RR,constraint=1,prior_slabpos=mods_all$constrained_all$fit$prior_slabpos,prior_pi=mods_all$constrained_all$fit$prior_pi)
+## constrained and ordered
+# prior_ordered <- investigate_priors(8,RR,constraint=1,prior_slabpos=c(1.6,8),prior_pi=c(1,0.5))
+## dirichlet without varselection
+prior_dirichlet <- investigate_priors(8,RR,constraint=2,prior_slabpos=mods_all$dirichlet_all$fit$prior_slabpos,prior_pi=mods_all$dirichlet_all$fit$prior_pi,prior_alphas=mods_all$dirichlet_all$fit$prior_alphas[[3]])
+## dirichlet with varselection
+prior_dirichlet_varsel <- investigate_priors(8,RR,constraint=1,prior_slabpos=mods_all$dirichlet_varsel_all$fit$prior_slabpos,prior_pi=mods_all$dirichlet_varsel_all$fit$prior_pi,prior_slabpos_shape_inf=mods_all$dirichlet_varsel_all$fit$prior_slabpos_shape_inf[[3]])
+
+df_constrained <- data.frame(prior_constrained$thetaPOS); colnames(df_constrained) <- as.character(1:8)
+df_constrained <- gather(df_constrained,component,weight)
+
+violin_constrained <- ggplot(data=df_constrained,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Constrained"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+# 
+# df_ordered <- prior_ordered$thetaPOS
+# L <- matrix(0,nrow=8,ncol=8) ## rank them
+# L[lower.tri(L)] <- 1
+# df_ordered <- df_ordered%*%L
+# df_ordered <- df_ordered[,rank(-w_prior)] ## put in correct order
+# df_ordered <- df_ordered/apply(df_ordered,1,sum) ## standardize to be w
+# colnames(df_ordered) <- as.character(1:8)
+# df_ordered <- gather(data.frame(df_ordered),component,weight)
+# 
+# violin_ordered <- ggplot(data=df_ordered,aes(y=weight,x=component))+
+#     geom_violin(trim=TRUE, fill="gray",scale="width")+
+#     # labs(title=expression("Informative Dirichlet Priors ("*L[m]*"=3)"),x="Component", y = "Weight")+
+#     labs(title=paste("Ordered"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+#     ylim(c(0,1))+
+#     # geom_boxplot(width=0.1)+
+#     theme_classic()
+
+
+df_dirichlet <- data.frame(prior_dirichlet$thetaPOS); colnames(df_dirichlet) <- as.character(1:8)
+df_dirichlet <- gather(df_dirichlet,component,weight)
+
+violin_dirichlet <- ggplot(data=df_dirichlet,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Dirichlet"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+df_dirichlet_varsel <- data.frame(prior_dirichlet_varsel$thetaPOS); colnames(df_dirichlet_varsel) <- as.character(1:8)
+df_dirichlet_varsel <- gather(df_dirichlet_varsel,component,weight)
+
+violin_dirichlet_varsel <- ggplot(data=df_dirichlet_varsel,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet Priors ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    labs(title=paste("Dirichlet+Selection"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+
+df_TEQ <- data.frame(weight=w_prior,component=1:8)
+
+violin_TEQ <- ggplot(data=df_TEQ,aes(y=weight,x=component))+
+    geom_point(shape=4)+
+    # labs(title=expression("Informative Dirichlet Priors ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    labs(title=paste("TEQ (Fixed Weights)"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+## posteriors
+
+postdf_constrained <- data.frame(mods_all$constrained_all$fit$thetaPOS[[3]]); colnames(postdf_constrained) <- as.character(1:8)
+postdf_constrained <- gather(postdf_constrained,component,weight)
+
+postviolin_constrained <- ggplot(data=postdf_constrained,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Constrained"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+# postdf_ordered <- data.frame(mods_all$ordered_all$fit$thetaPOS[[1]]); colnames(postdf_ordered) <- as.character(1:8)
+# postdf_ordered <- gather(postdf_ordered,component,weight)
+# 
+# postviolin_ordered <- ggplot(data=postdf_ordered,aes(y=weight,x=component))+
+#     geom_violin(trim=TRUE, fill="gray",scale="width")+
+#     # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+#     # ylim(c(0,1))+
+#     labs(title=paste("ordered"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+#     ylim(c(0,1))+
+#     # geom_boxplot(width=0.1)+
+#     theme_classic()
+
+postdf_dirichlet <- data.frame(mods_all$dirichlet_all$fit$thetaPOS[[3]]); colnames(postdf_dirichlet) <- as.character(1:8)
+postdf_dirichlet <- gather(postdf_dirichlet,component,weight)
+
+postviolin_dirichlet <- ggplot(data=postdf_dirichlet,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Dirichlet"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+postdf_dirichlet_varsel <- data.frame(mods_all$dirichlet_varsel_all$fit$thetaPOS[[3]]); colnames(postdf_dirichlet_varsel) <- as.character(1:8)
+postdf_dirichlet_varsel <- gather(postdf_dirichlet_varsel,component,weight)
+
+postviolin_dirichlet_varsel <- ggplot(data=postdf_dirichlet_varsel,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray",scale="width")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Dirichlet+Selection"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+postdf_TEQ <- data.frame(weight=w_prior,component=1:8)
+
+postviolin_TEQ <- ggplot(data=df_TEQ,aes(y=weight,x=component))+
+    geom_point(shape=4)+
+    # labs(title=expression("Informative Dirichlet Priors ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    labs(title=paste("TEQ (Fixed Weights)"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+## indexwise plots
+index_constrained <- plot_univar_hnew_indexwise2(mods_all$constrained_all$pred_ind,ylims=c(-0.5,0.5))[[3]]
+# index_ordered <- plot_univar_hnew_indexwise2(mods_all$ordered_all$pred_ind,ylims=c(-0.25,0.75))[[3]]
+index_dirichlet <- plot_univar_hnew_indexwise2(mods_all$dirichlet_all$pred_ind,ylims=c(-0.5,0.5))[[3]]
+index_dirichlet_varsel <- plot_univar_hnew_indexwise2(mods_all$dirichlet_varsel_all$pred_ind,ylims=c(-0.5,0.5))[[3]]
+index_TEQ <- plot_univar_hnew_indexwise2(mods_all$TEQ_all$pred_ind,ylims=c(-0.5,0.5))[[3]]
+
+## overall plots
+overall_constrained <- plot_univar_hnew2(mods_all$constrained_all$pred_overall,ylims=c(-0.4,0.6))
+# overall_ordered <- plot_univar_hnew2(mods_all$ordered_overall3$pred_overall,ylims=c(-0.4,0.6))
+overall_dirichlet <- plot_univar_hnew2(mods_all$dirichlet_all$pred_overall,ylims=c(-0.4,0.6))
+overall_dirichlet_varsel <- plot_univar_hnew2(mods_all$dirichlet_varsel_all$pred_overall,ylims=c(-0.4,0.6))
+overall_TEQ <- plot_univar_hnew2(mods_all$TEQ_all$pred_overall,ylims=c(-0.4,0.6))
+
+
+gridplots <- arrangeGrob(violin_constrained,
+  # violin_ordered, ## didnt run ordered!
+  violin_dirichlet_varsel,
+  violin_dirichlet,
+  violin_TEQ,
+  postviolin_constrained,
+  # postviolin_ordered,
+  postviolin_dirichlet_varsel,
+  postviolin_dirichlet,
+  postviolin_TEQ,
+  index_constrained, ## indexwise look similar because we fix the weights!
+  # index_ordered,
+  index_dirichlet_varsel,
+  index_dirichlet,
+  index_TEQ,
+  # overall_constrained,
+  # # overall_ordered,
+  # overall_dirichlet_varsel,
+  # overall_dirichlet,
+  # overall_TEQ,
+  nrow=3)
+
+ggsave("gridplots_all.pdf",plot=gridplots,width=12,height=12,units="in")
+
+## unconstrained only
+index_unconstrained <- plot_univar_hnew_indexwise2(mods_all$unconstrained_all$pred_ind,ylims=c(-0.5,0.5))[[3]]
+ggsave("index_unconstrained_all.pdf",plot=index_unconstrained,width=3,height=3,units="in")
+
+```
+
+
+## Interactions (3 index model)
+
+```{r bsmim_grid, echo=FALSE, fig.height=3, fig.width=3.5, warning=FALSE}
+qcutoff <- 0.6744898 ## for 50% intervals (rather than 1.96 for 95%)
+range <- c(-0.2,0.6) ## ylims
+red <- "#F21A00"
+ylw <- "#EBCC2A"
+blu <- "#3B9AB2"
+ryb <- c(ylw,red,blu)
+
+
+df_inter_unconstrained <- mods_all$unconstrained_all$pred_inter
+df_inter_unconstrained <- within(df_inter_unconstrained, lci <- est-qcutoff*sd)
+df_inter_unconstrained <- within(df_inter_unconstrained, uci <- est+qcutoff*sd)
+pp_inter_unconstrained <- ggplot(df_inter_unconstrained, aes(grid)) +
+    geom_smooth(aes(y=est, col = as.factor(quantile)), stat = "identity",fill="white",size=0.5) +
+    geom_ribbon(aes(ymin=lci,ymax=uci,fill=as.factor(quantile)),alpha=0.2)+
+    # scale_colour_ghibli_d("LaputaMedium",-1,guide="none")+
+    # scale_fill_ghibli_d("LaputaMedium",-1,guide="none")+
+    scale_color_manual(values=ryb,guide="none")+
+    scale_fill_manual(values=ryb,guide="none")+
+    facet_grid(var2 ~ var1, scales = "free_x")+# free_x allows different x axis limits
+    ggtitle("Unconstrained") +
+    labs(x="",y="",col="Quantile")+
+    ylim(range)+
+  theme_light()+
+    theme(strip.text = element_text(colour = 'black'),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+    
+
+df_inter_constrained <- mods_all$constrained_all$pred_inter
+df_inter_constrained <- within(df_inter_constrained, lci <- est-qcutoff*sd)
+df_inter_constrained <- within(df_inter_constrained, uci <- est+qcutoff*sd)
+pp_inter_constrained <- ggplot(df_inter_constrained, aes(grid)) +
+    geom_smooth(aes(y=est, col = as.factor(quantile)), stat = "identity",fill="white",size=0.5) +
+    geom_ribbon(aes(ymin=lci,ymax=uci,fill=as.factor(quantile)),alpha=0.2)+
+    # scale_colour_ghibli_d("LaputaMedium",-1,guide="none")+
+    # scale_fill_ghibli_d("LaputaMedium",-1,guide="none")+
+    scale_color_manual(values=ryb,guide="none")+
+    scale_fill_manual(values=ryb,guide="none")+
+    facet_grid(var2 ~ var1, scales = "free_x")+# free_x allows different x axis limits
+    ggtitle("Constrained") +
+    labs(x="",y="",col="Quantile")+
+    ylim(range)+
+  theme_light()+
+    theme(strip.text = element_text(colour = 'black'),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+df_inter_dirichlet <- mods_all$dirichlet_all$pred_inter
+df_inter_dirichlet <- within(df_inter_dirichlet, lci <- est-qcutoff*sd)
+df_inter_dirichlet <- within(df_inter_dirichlet, uci <- est+qcutoff*sd)
+pp_inter_dirichlet <- ggplot(df_inter_dirichlet, aes(grid)) +
+    geom_smooth(aes(y=est, col = as.factor(quantile)), stat = "identity",fill="white",size=0.5) +
+    geom_ribbon(aes(ymin=lci,ymax=uci,fill=as.factor(quantile)),alpha=0.2)+
+    # scale_colour_ghibli_d("LaputaMedium",-1,guide="none")+
+    # scale_fill_ghibli_d("LaputaMedium",-1,guide="none")+
+    scale_color_manual(values=ryb,guide="none")+
+    scale_fill_manual(values=ryb,guide="none")+
+    facet_grid(var2 ~ var1, scales = "free_x")+# free_x allows different x axis limits
+    ggtitle("Dirichlet") +
+    labs(x="",y="",col="Quantile")+
+    ylim(range)+
+  theme_light()+
+    theme(strip.text = element_text(colour = 'black'),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+df_inter_dirichlet_varsel <- mods_all$dirichlet_varsel_all$pred_inter
+df_inter_dirichlet_varsel <- within(df_inter_dirichlet_varsel, lci <- est-qcutoff*sd)
+df_inter_dirichlet_varsel <- within(df_inter_dirichlet_varsel, uci <- est+qcutoff*sd)
+pp_inter_dirichlet_varsel <- ggplot(df_inter_dirichlet_varsel, aes(grid)) +
+    geom_smooth(aes(y=est, col = as.factor(quantile)), stat = "identity",fill="white",size=0.5) +
+    geom_ribbon(aes(ymin=lci,ymax=uci,fill=as.factor(quantile)),alpha=0.2)+
+    # scale_colour_ghibli_d("LaputaMedium",-1,guide="none")+
+    # scale_fill_ghibli_d("LaputaMedium",-1,guide="none")+
+    scale_color_manual(values=ryb,guide="none")+
+    scale_fill_manual(values=ryb,guide="none")+
+    facet_grid(var2 ~ var1, scales = "free_x")+# free_x allows different x axis limits
+    ggtitle("Dirichlet+Selection") +
+    labs(x="",y="",col="Quantile")+
+    ylim(range)+
+  theme_light()+
+    theme(strip.text = element_text(colour = 'black'),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+df_inter_TEQ <- mods_all$TEQ_all$pred_inter
+df_inter_TEQ <- within(df_inter_TEQ, lci <- est-qcutoff*sd)
+df_inter_TEQ <- within(df_inter_TEQ, uci <- est+qcutoff*sd)
+pp_inter_TEQ <- ggplot(df_inter_TEQ, aes(grid)) +
+    geom_smooth(aes(y=est, col = as.factor(quantile)), stat = "identity",fill="white",size=0.5) +
+    geom_ribbon(aes(ymin=lci,ymax=uci,fill=as.factor(quantile)),alpha=0.2)+
+    # scale_colour_ghibli_d("LaputaMedium",-1,guide="none")+
+    # scale_fill_ghibli_d("LaputaMedium",-1,guide="none")+
+    scale_color_manual(values=ryb,guide="none")+
+    scale_fill_manual(values=ryb)+ ## want guide on final fig
+    facet_grid(var2 ~ var1, scales = "free_x")+# free_x allows different x axis limits
+    ggtitle("TEQ") +
+    labs(x="",y="",fill="Quantile")+
+    ylim(range)+
+  theme_light()+
+    theme(strip.text = element_text(colour = 'black'),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+
+grid_plots_inter <- arrangeGrob(#pp_inter_unconstrained,
+    arrangeGrob(pp_inter_constrained,
+    pp_inter_dirichlet_varsel,
+    rectGrob(gp=gpar(fill="white",col="white")),nrow=1,widths=c(7,7,1.1)),
+    arrangeGrob(pp_inter_dirichlet,
+    pp_inter_TEQ,nrow=1,widths=c(7,8)),
+    nrow=2)
+
+ggsave("grid_plots_inter.pdf",plot=grid_plots_inter,width=12,height=12,units="in")
+
+
+grid_plots_inter_long <- arrangeGrob(#pp_inter_unconstrained,
+                                pp_inter_constrained,
+                                pp_inter_dirichlet_varsel,
+                                pp_inter_dirichlet,
+                                pp_inter_TEQ,
+                                nrow=1,widths=c(7,7,7,8))
+
+ggsave("grid_plots_inter_long.pdf",plot=grid_plots_inter_long,width=20,height=5,units="in")
+
+## unconstrained only
+ggsave("pp_inter_unconstrained.pdf",plot=pp_inter_unconstrained,width=5,height=5,units="in")
+
+
+```
+
+```{r bsmim_grid_centered, echo=FALSE, fig.height=3, fig.width=3.5, warning=FALSE}
+qcutoff <- 0.6744898 ## for 50% intervals (rather than 1.96 for 95%)
+range <- c(-0.3,0.3) ## ylims
+red <- "#F21A00"
+ylw <- "#EBCC2A"
+blu <- "#3B9AB2"
+ryb <- c(ylw,red,blu)
+
+
+df_inter_centered_unconstrained <- mods_all$unconstrained_all$pred_inter
+df_inter_centered_unconstrained <- within(df_inter_centered_unconstrained, lci <- est_centered-qcutoff*sd_centered)
+df_inter_centered_unconstrained <- within(df_inter_centered_unconstrained, uci <- est_centered+qcutoff*sd_centered)
+pp_inter_centered_unconstrained <- ggplot(df_inter_centered_unconstrained, aes(grid)) +
+    geom_smooth(aes(y=est_centered, col = as.factor(quantile)), stat = "identity",fill="white",size=0.5) +
+    geom_ribbon(aes(ymin=lci,ymax=uci,fill=as.factor(quantile)),alpha=0.15)+
+    # scale_colour_ghibli_d("LaputaMedium",-1,guide="none")+
+    # scale_fill_ghibli_d("LaputaMedium",-1,guide="none")+
+    scale_color_manual(values=ryb,guide="none")+
+    scale_fill_manual(values=ryb,guide="none")+
+    facet_grid(var2 ~ var1, scales = "free_x")+# free_x allows different x axis limits
+    ggtitle("Unconstrained") +
+    labs(x="",y="",col="Quantile")+
+    ylim(range)+
+  theme_light()+
+    theme(strip.text = element_text(colour = 'black'),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+    
+
+df_inter_centered_constrained <- mods_all$constrained_all$pred_inter
+df_inter_centered_constrained <- within(df_inter_centered_constrained, lci <- est_centered-qcutoff*sd_centered)
+df_inter_centered_constrained <- within(df_inter_centered_constrained, uci <- est_centered+qcutoff*sd_centered)
+pp_inter_centered_constrained <- ggplot(df_inter_centered_constrained, aes(grid)) +
+    geom_smooth(aes(y=est_centered, col = as.factor(quantile)), stat = "identity",fill="white",size=0.5) +
+    geom_ribbon(aes(ymin=lci,ymax=uci,fill=as.factor(quantile)),alpha=0.15)+
+    # scale_colour_ghibli_d("LaputaMedium",-1,guide="none")+
+    # scale_fill_ghibli_d("LaputaMedium",-1,guide="none")+
+    scale_color_manual(values=ryb,guide="none")+
+    scale_fill_manual(values=ryb,guide="none")+
+    facet_grid(var2 ~ var1, scales = "free_x")+# free_x allows different x axis limits
+    ggtitle("Constrained") +
+    labs(x="",y="",col="Quantile")+
+    ylim(range)+
+  theme_light()+
+    theme(strip.text = element_text(colour = 'black'),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+df_inter_centered_dirichlet <- mods_all$dirichlet_all$pred_inter
+df_inter_centered_dirichlet <- within(df_inter_centered_dirichlet, lci <- est_centered-qcutoff*sd_centered)
+df_inter_centered_dirichlet <- within(df_inter_centered_dirichlet, uci <- est_centered+qcutoff*sd_centered)
+pp_inter_centered_dirichlet <- ggplot(df_inter_centered_dirichlet, aes(grid)) +
+    geom_smooth(aes(y=est_centered, col = as.factor(quantile)), stat = "identity",fill="white",size=0.5) +
+    geom_ribbon(aes(ymin=lci,ymax=uci,fill=as.factor(quantile)),alpha=0.15)+
+    # scale_colour_ghibli_d("LaputaMedium",-1,guide="none")+
+    # scale_fill_ghibli_d("LaputaMedium",-1,guide="none")+
+    scale_color_manual(values=ryb,guide="none")+
+    scale_fill_manual(values=ryb,guide="none")+
+    facet_grid(var2 ~ var1, scales = "free_x")+# free_x allows different x axis limits
+    ggtitle("Dirichlet") +
+    labs(x="",y="",col="Quantile")+
+    ylim(range)+
+  theme_light()+
+    theme(strip.text = element_text(colour = 'black'),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+df_inter_centered_dirichlet_varsel <- mods_all$dirichlet_varsel_all$pred_inter
+df_inter_centered_dirichlet_varsel <- within(df_inter_centered_dirichlet_varsel, lci <- est_centered-qcutoff*sd_centered)
+df_inter_centered_dirichlet_varsel <- within(df_inter_centered_dirichlet_varsel, uci <- est_centered+qcutoff*sd_centered)
+pp_inter_centered_dirichlet_varsel <- ggplot(df_inter_centered_dirichlet_varsel, aes(grid)) +
+    geom_smooth(aes(y=est_centered, col = as.factor(quantile)), stat = "identity",fill="white",size=0.5) +
+    geom_ribbon(aes(ymin=lci,ymax=uci,fill=as.factor(quantile)),alpha=0.15)+
+    # scale_colour_ghibli_d("LaputaMedium",-1,guide="none")+
+    # scale_fill_ghibli_d("LaputaMedium",-1,guide="none")+
+    scale_color_manual(values=ryb,guide="none")+
+    scale_fill_manual(values=ryb,guide="none")+
+    facet_grid(var2 ~ var1, scales = "free_x")+# free_x allows different x axis limits
+    ggtitle("Dirichlet+Selection") +
+    labs(x="",y="",col="Quantile")+
+    ylim(range)+
+  theme_light()+
+    theme(strip.text = element_text(colour = 'black'),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+df_inter_centered_TEQ <- mods_all$TEQ_all$pred_inter
+df_inter_centered_TEQ <- within(df_inter_centered_TEQ, lci <- est_centered-qcutoff*sd_centered)
+df_inter_centered_TEQ <- within(df_inter_centered_TEQ, uci <- est_centered+qcutoff*sd_centered)
+pp_inter_centered_TEQ <- ggplot(df_inter_centered_TEQ, aes(grid)) +
+    geom_smooth(aes(y=est_centered, col = as.factor(quantile)), stat = "identity",fill="white",size=0.5) +
+    geom_ribbon(aes(ymin=lci,ymax=uci,fill=as.factor(quantile)),alpha=0.15)+
+    # scale_colour_ghibli_d("LaputaMedium",-1,guide="none")+
+    # scale_fill_ghibli_d("LaputaMedium",-1,guide="none")+
+    scale_color_manual(values=ryb,guide="none")+
+    scale_fill_manual(values=ryb)+ ## want guide on final fig
+    facet_grid(var2 ~ var1, scales = "free_x")+# free_x allows different x axis limits
+    ggtitle("TEQ") +
+    labs(x="",y="",fill="Quantile")+
+    ylim(range)+
+  theme_light()+
+    theme(strip.text = element_text(colour = 'black'),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+
+grid_plots_inter_centered <- arrangeGrob(#pp_inter_centered_unconstrained,
+    arrangeGrob(pp_inter_centered_constrained,
+                pp_inter_centered_dirichlet_varsel,
+                rectGrob(gp=gpar(fill="white",col="white")),nrow=1,widths=c(7,7,1.1)),
+                arrangeGrob(pp_inter_centered_dirichlet,
+                pp_inter_centered_TEQ,nrow=1,widths=c(7,8)),
+    nrow=2)
+
+ggsave("grid_plots_inter_centered.pdf",plot=grid_plots_inter_centered,width=12,height=12,units="in")
+
+
+grid_plots_inter_centered_long <- arrangeGrob(#pp_inter_centered_unconstrained,
+                                pp_inter_centered_constrained,
+                                pp_inter_centered_dirichlet_varsel,
+                                pp_inter_centered_dirichlet,
+                                pp_inter_centered_TEQ,
+                                nrow=1,widths=c(7,7,7,8))
+
+ggsave("grid_plots_inter_centered_long.pdf",plot=grid_plots_inter_centered_long,width=20,height=5,units="in")
+
+## unconstrained only
+ggsave("pp_inter_centered_unconstrained.pdf",plot=pp_inter_centered_unconstrained,width=5,height=5,units="in")
+
+```
+
+
+## Estimated Means (3 index model)
+
+```{r estimated_means_all, echo=FALSE,  warning=FALSE}
+newz <- NULL#matrix(0,nrow=2,ncol=ncol(mods_all$TEQ_index3$fit$z))
+xmedians <- apply(mods_all$constrained_all$fit$x[[3]],2,median)
+newx <- matrix(xmedians,nrow=2,ncol=length(xmedians),byrow=TRUE)
+newx[,2] <- quantile(mods_all$constrained_all$fit$x[[3]][,2],c(0.75,0.25)) 
+newx[,5] <- quantile(mods_all$constrained_all$fit$x[[3]][,5],c(0.25,0.75))
+TEQ_wts <- c(0.6984289,4.0351995,0.5539950,0.1554525,1.7207612,0.4935566,0.4198955,0.1063727 )
+newxTEQ <- newx%*%TEQ_wts
+
+## add first 2 index medians
+xmedians1 <- apply(mods_all$constrained_all$fit$x[[1]],2,median)
+xmedians2 <- apply(mods_all$constrained_all$fit$x[[2]],2,median)
+newxlist <- list(matrix(xmedians1,nrow=2,ncol=length(xmedians1),byrow=TRUE),
+                 matrix(xmedians2,nrow=2,ncol=length(xmedians2),byrow=TRUE),
+                 newx)
+newxlistTEQ <- list(matrix(xmedians1,nrow=2,ncol=length(xmedians1),byrow=TRUE),
+                 matrix(xmedians2,nrow=2,ncol=length(xmedians2),byrow=TRUE),
+                 as.matrix(newxTEQ))
+  
+est_all_7525_constrained <- predict_hnew_X2(mods_all$constrained_all$fit,newX=newxlist,newZ = newz)
+est_all_7525_dirichlet_varsel <- predict_hnew_X2(mods_all$dirichlet_varsel_all$fit,newX=newxlist,newZ = newz)
+est_all_7525_dirichlet <- predict_hnew_X2(mods_all$dirichlet_all$fit,newX=newxlist,newZ = newz)
+est_all_7525_TEQ <- predict_hnew_X2(mods_all$TEQ_all$fit,newX=newxlistTEQ,newZ = newz)
+
+```
+
+```{r estimated_mean_out_all, echo=FALSE,  warning=FALSE}
+cbind(est_all_7525_constrained$fits$mean,est_all_7525_constrained$fits$lower,est_all_7525_constrained$fits$upper)
+cbind(est_all_7525_dirichlet_varsel$fits$mean,est_all_7525_dirichlet_varsel$fits$lower,est_all_7525_dirichlet_varsel$fits$upper)
+cbind(est_all_7525_dirichlet$fits$mean,est_all_7525_dirichlet$fits$lower,est_all_7525_dirichlet$fits$upper)
+cbind(est_all_7525_TEQ$fits$mean,est_all_7525_TEQ$fits$lower,est_all_7525_TEQ$fits$upper)
+
+```
+
+## Model Fit (3 index model)
+
+```{r MSE_all, echo=FALSE, warning=FALSE}
+
+mods_all$unconstrained_all$cv$RMSE
+mods_all$constrained_all$cv$RMSE
+mods_all$dirichlet_all$cv$RMSE
+mods_all$dirichlet_varsel_all$cv$RMSE
+mods_all$TEQ_all$cv$RMSE
+
+```
+
+
+
+
+
+
+# Example Plots of Priors (Violin Plots) 
+
+```{r priors_violins, echo=FALSE, warning=FALSE}
+
+## without varselection
+prior_dirichlet <- investigate_priors(3,4000,constraint=2,prior_alphas=5*(1:3),prior_slabrho=c(1,1))
+## with varselection
+prior_dirichlet_varsel <- investigate_priors(3,4000,constraint=1,prior_slabpos=c(1.6,8),prior_slabpos_shape_inf=5*(1:3),prior_pi=c(1,0.34))
+
+df_nosel <- data.frame(prior_dirichlet$thetaPOS); colnames(df_nosel) <- c("1","2","3")
+df_nosel <- gather(df_nosel,component,weight)
+
+violin_nosel <- ggplot(data=df_nosel,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray")+
+    # labs(title=expression("Informative Dirichlet ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    # ylim(c(0,1))+
+    labs(title=paste("Dirichlet"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+df_varsel <- data.frame(prior_dirichlet_varsel$thetaPOS); colnames(df_varsel) <- c("1","2","3")
+df_varsel <- gather(df_varsel,component,weight)
+
+violin_varsel <- ggplot(data=df_varsel,aes(y=weight,x=component))+
+    geom_violin(trim=TRUE, fill="gray")+
+    # labs(title=expression("Informative Dirichlet Priors ("*L[m]*"=3)"),x="Component", y = "Weight")+
+    labs(title=paste("Dirichlet + Selection"),x=expression("Component "*(italic(l))), y = expression("Weight "*(italic(w[ml]))))+
+    ylim(c(0,1))+
+    # geom_boxplot(width=0.1)+
+    theme_classic()
+
+
+
+violin_plots <- arrangeGrob(violin_nosel,violin_varsel,nrow=1)
+
+ggsave("violin_plots.pdf",plot=violin_plots,width=6,height=3,units="in")
+
+```
+
+
+
+# Supplementary:  Investigating Priors on Weights
+
+
+```{r priors, echo=FALSE, warning=FALSE}
+
+## without varselection
+prior_dirichlet <- investigate_priors(8,2000,constraint=2,prior_alphas=10*w_prior,prior_slabrho=c(1,1))
+## with varselection
+prior_dirichlet_varsel <- investigate_priors(8,2000,constraint=1,prior_slabpos=c(1.6,8),prior_slabpos_shape_inf=10*w_prior,prior_pi=c(1,0.25))
+par(mfrow=c(1,3))
+for(jj in 1:8){
+    hist(prior_dirichlet$theta[,jj],xlim=c(0,1),prob=T,main="Dirichlet",breaks=seq(0,1,0.1),xlab="theta")
+    hist(prior_dirichlet_varsel$theta[,jj],xlim=c(0,1),prob=T,main="Varsel",breaks=seq(0,1,0.1),xlab="theta")
+    hist(prior_dirichlet_varsel$theta[prior_dirichlet_varsel$theta[,jj]>0,jj],xlim=c(0,1),prob=T,main="Varsel (>0)",breaks=seq(0,1,0.1),xlab="theta")
+}
+# par(mfrow=c(1,2))
+# for(jj in 1:8){
+#     hist(prior_dirichlet$theta[,jj],xlim=c(0,1),prob=T,main="Dirichlet",breaks=seq(0,1,0.1),xlab="theta")
+#     hist(prior_dirichlet_varsel$theta[,jj],xlim=c(0,1),prob=T,main="Varsel",breaks=seq(0,1,0.1),xlab="theta")
+# }
+# par(mfrow=c(1,2))
+# for(jj in 1:8){
+#     hist(prior_dirichlet$theta[prior_dirichlet$theta[,jj]>0,jj],xlim=c(0,1),prob=T,main="Dirichlet (>0)",breaks=seq(0,1,0.1),xlab="theta")
+#     hist(prior_dirichlet_varsel$theta[prior_dirichlet_varsel$theta[,jj]>0,jj],xlim=c(0,1),prob=T,main="Varsel (>0)",breaks=seq(0,1,0.1),xlab="theta")
+# }
+par(mfrow=c(1,1))
+```
+When you change the amount of variable selection, it ends up changing the shape of the priors a lot more than usual, because of the constraints that make these have norm 1. 
