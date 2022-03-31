@@ -2,9 +2,11 @@
 Code for reproducing "Integrating Biological Knowledge in Kernel-Based Analyses of Environmental Mixtures and Health"
 
 ## Install bsmim2 for functions used to fit a BMIM
+```
 library(devtools)
 devtools::install_github("glenmcgee/bsmim2") 
 library(bsmim2)
+```
 
 ## Download NHANES data
 - Download "studypop.csv" at https://github.com/lizzyagibson/SHARP.Mixtures.Workshop/blob/1f2da3a14bb096d99b2c45a69d11053b0ef60088/Data/studypop.csv
